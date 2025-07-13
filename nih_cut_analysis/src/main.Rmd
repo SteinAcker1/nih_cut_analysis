@@ -1,0 +1,35 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(rentrez)
+source("create_pubmed_query.R")
+```
+
+```{r}
+# Data must be a CSV exported from NIH RePORTER with all columns imported as character type
+nih_iowa_2016_df <- read.csv("../data/nih_iowa_2016.csv", colClasses = "character")
+```
+
+```{r}
+# terms (char or vec): list of substrings to search in project terms (NB: may produce misleading results, e.g. " race" matches "racemic")
+# df (data.frame): RePORTER dataset to use
+# start_year (int): exclude all previous years before this point (should match the first FY in your df)
+# verbose (bool, default=TRUE): print number of projects, titles, and funding amounts to your console
+query <- create_pubmed_query(terms=c("racial", "racism", "racist"), df=nih_iowa_2016_df, start_year=2016)
+```
+
+```{r}
+# See rentrez documentation for more info on how to interact with PubMed from R
+pmid <- entrez_search(db = "pubmed", term = query, retmax = 1000)$ids
+summary <- entrez_summary(db = "pubmed", id = pmid)
+refs <- summary |> 
+  extract_from_esummary(c("title", "lastauthor", "pubdate", "source")) |> 
+  t() |> 
+  data.frame()
+```
+
+

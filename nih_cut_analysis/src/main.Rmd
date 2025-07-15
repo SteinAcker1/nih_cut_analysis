@@ -4,32 +4,28 @@ output: html_notebook
 ---
 
 ```{r}
-library(tidyverse)
-library(rentrez)
-source("create_pubmed_query.R")
+if(!require(devtools)) install.packages("devtools")
+devtools::install_github("SteinAcker1/fedscifund")
+library(fedscifund)
 ```
 
 ```{r}
-# Data must be a CSV exported from NIH RePORTER with all columns imported as character type
-nih_iowa_2016_df <- read.csv("../data/nih_iowa_2016.csv", colClasses = "character")
+# Fetch all NIH grants to Iowa-based organizations in FY2016
+df <- query_reporter(criteria = list(org_states = "IA", fiscal_years = 2016))
 ```
 
 ```{r}
-# terms (char or vec): list of substrings to search in project terms (NB: may produce misleading results, e.g. " race" matches "racemic")
-# df (data.frame): RePORTER dataset to use
-# start_year (int): exclude all previous years before this point (should match the first FY in your df)
-# verbose (bool, default=TRUE): print number of projects, titles, and funding amounts to your console
-query <- create_pubmed_query(terms=c("racial", "racism", "racist"), df=nih_iowa_2016_df, start_year=2016)
+# Identify which grants contained "racial", "racism", "racist", or "race" in project terms, title, or abstract
+query <- create_pubmed_query_from_reporter(terms=c("racial", "racism", "racist", "race"), df=df, verbose = TRUE)
 ```
 
 ```{r}
-# See rentrez documentation for more info on how to interact with PubMed from R
-pmid <- entrez_search(db = "pubmed", term = query, retmax = 1000)$ids
-summary <- entrez_summary(db = "pubmed", id = pmid)
-refs <- summary |> 
-  extract_from_esummary(c("title", "lastauthor", "pubdate", "source")) |> 
-  t() |> 
-  data.frame()
+# Fetch PMIDs from studies supported by these grants and filter for clinical trials
+pmid <- query_pubmed(query = query)$ids
+pmid_chunk <- split(pmid, ceiling(seq_along(pmid) / 100))
+clin_trials <- c()
+for(i in pmid_chunk) {
+  clin_trials <- c(clin_trials, filter_clinical_trials(i)$ids)
+}
+print(clin_trials)
 ```
-
-
